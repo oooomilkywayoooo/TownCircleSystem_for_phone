@@ -134,18 +134,19 @@ final List<ChatMessage> leaderChat = [
   const ChatMessage(sender: CurrentUser.name, text: 'ありがとうございます、よろしくお願いします。', time: '09/18 09:02', isMe: true),
 ];
 
+/// ゴミ当番は組単位ではなく会員個人単位で割り当てる。
 class GarbageDuty {
   final String month; // yyyy年MM月
-  final String group;
-  const GarbageDuty({required this.month, required this.group});
+  final String name;
+  const GarbageDuty({required this.month, required this.name});
 }
 
 const List<GarbageDuty> garbageDuties = [
-  GarbageDuty(month: '2026年07月', group: '2組'),
-  GarbageDuty(month: '2026年08月', group: '3組'),
-  GarbageDuty(month: '2026年09月', group: '1組'),
-  GarbageDuty(month: '2026年10月', group: '2組'),
-  GarbageDuty(month: '2026年11月', group: '3組'),
+  GarbageDuty(month: '2026年07月', name: '高橋 次郎'),
+  GarbageDuty(month: '2026年08月', name: '佐藤 太郎'),
+  GarbageDuty(month: '2026年09月', name: CurrentUser.name),
+  GarbageDuty(month: '2026年10月', name: '高橋 次郎'),
+  GarbageDuty(month: '2026年11月', name: '佐藤 太郎'),
 ];
 
 class DocumentFile {
