@@ -6,6 +6,12 @@
       "runtimeExecutable": "php",
       "runtimeArgs": ["-S", "localhost:8080", "-t", "admin"],
       "port": 8080
+    },
+    {
+      "name": "member-app-web",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8090", "-t", "mobile/build/web"],
+      "port": 8090
     }
   ]
 }
