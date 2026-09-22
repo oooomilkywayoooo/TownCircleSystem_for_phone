@@ -20,40 +20,41 @@
 - メールアドレス重複が409、必須項目未入力・パスワード短すぎが422で拒否されること
 - 許可されていないHTTPメソッドが405で拒否されること
 - 回覧板の既読化で`is_read`が0→1に変わること、月フィルターが正しく絞り込むこと
+- パスワードリセット申請が、登録済み/未登録メールアドレスどちらでも同じレスポンスを返すこと
+- スケジュールの月フィルターが正しく絞り込むこと
+- 全体チャット・組長とのチャットへの投稿がそれぞれの`room_type`で正しく保存・取得できること、空メッセージが422で拒否されること
+- ご意見箱で`is_anonymous:true`の投稿がDB上も`member_id`がNULLで保存されること（named投稿は`member_id`が入ること）
 
 ## エンドポイント一覧
 
-### 実装・検証済み
+全エンドポイント実装・検証済みです。
 
 | メソッド | パス | 認証 | 内容 |
 |---|---|---|---|
 | POST | `/v1/auth/register.php` | 不要 | 新規登録 |
 | POST | `/v1/auth/login.php` | 不要 | ログイン。トークンを発行 |
+| POST | `/v1/auth/password_reset_request.php` | 不要 | パスワードリセットのメール送信申請（登録有無に関わらず同じレスポンス） |
 | GET | `/v1/groups.php` | 不要 | 組一覧（新規登録画面のグループ選択用） |
 | GET | `/v1/me.php` | 必要 | 会員情報取得（会員情報変更画面のプリフィル用） |
 | PUT | `/v1/me.php` | 必要 | 会員情報変更（`current_password`必須。パスワード自体を変える場合のみ`new_password`を追加） |
 | GET | `/v1/notices.php` | 必要 | お知らせ一覧 |
 | GET | `/v1/circulars.php?month=YYYY-MM` | 必要 | 回覧板一覧（`is_read`つき、`month`省略で全件） |
 | POST | `/v1/circular_read.php?id={id}` | 必要 | 回覧板を既読にする |
-
-### 仕様のみ（未実装）
-
-同じ`lib/bootstrap.php` `lib/auth.php`のパターンで実装できます。優先度が高い順に並べています。
-
-| メソッド | パス | 認証 | 内容 |
-|---|---|---|---|
-| POST | `/v1/auth/password_reset_request.php` | 不要 | パスワードリセットのメール送信申請 |
-| GET | `/v1/schedules.php?month=YYYY-MM` | 必要 | スケジュール一覧 |
+| GET | `/v1/schedules.php?month=YYYY-MM` | 必要 | スケジュール一覧（`month`省略で全件） |
 | GET | `/v1/chat_all.php` | 必要 | 町内会全体チャットの取得 |
 | POST | `/v1/chat_all.php` | 必要 | 町内会全体チャットへの投稿 |
 | GET | `/v1/chat_leader.php` | 必要 | 自分の組の組長との個別チャット取得 |
-| POST | `/v1/chat_leader.php` | 必要 | 組長への送信 |
+| POST | `/v1/chat_leader.php` | 必要 | 組長への送信（下記の制約を参照） |
 | GET | `/v1/garbage_duties.php` | 必要 | ゴミ当番一覧（会員個人単位） |
 | GET | `/v1/surveys.php` | 必要 | アンケート一覧（Googleフォームリンク） |
 | GET | `/v1/documents.php` | 必要 | 関連資料一覧 |
 | POST | `/v1/opinions.php` | 必要\* | ご意見送信。`is_anonymous:true`のときはサーバー側で`member_id`を保存しない |
 
 \* 送信自体はログイン済み会員のみだが、匿名フラグによりDB上は投稿者を特定できなくする。
+
+### `chat_leader.php`の既知の制約
+
+スレッドは常に「ログイン中の会員自身」を軸に特定します（`chat_messages.member_id` = 自分のid）。組長自身がこのAPIでログインしても、返ってくるのは「組長である自分」と「“自分の”組長」とのスレッド、つまり通常は自分自身の会員行動と同じ扱いになり、**他の会員から来たスレッド一覧を見る・代理返信する機能（組長用の受信箱）はまだありません**。これは現状のFlutterモックが会員1人分の視点しか実装していないことに合わせた意図的なスコープで、組長が複数の会員とやり取りする画面を作る際に別途エンドポイントが必要です。
 
 ## レスポンス例
 
@@ -84,8 +85,8 @@ Flutter側からは`http`パッケージ等で`http://<ホスト>:8099/v1/...`�
 
 ## 未確定・次に決めること
 
-1. 上記「仕様のみ」の8エンドポイントの実装
-2. Flutter側の実際のHTTP通信化（`http`パッケージ導入、トークン保存、エラーハンドリングのUI反映）
-3. 管理者画面（PHP）側のDB接続実装（`admin/`の各画面のダミー配列を実クエリに置き換える）
-4. 画像・PDFアップロードの実装（`circulars.image_path` / `documents.file_path`の保存先確定）
-5. 本番のCORS設定（現状`Access-Control-Allow-Origin: *`は開発用）
+1. Flutter側の実際のHTTP通信化（`http`パッケージ導入、トークン保存、エラーハンドリングのUI反映）
+2. 管理者画面（PHP）側のDB接続実装（`admin/`の各画面のダミー配列を実クエリに置き換える）
+3. 画像・PDFアップロードの実装（`circulars.image_path` / `documents.file_path`の保存先確定）
+4. 本番のCORS設定（現状`Access-Control-Allow-Origin: *`は開発用）
+5. 組長用の受信箱機能（複数会員とのチャットスレッドを一覧・返信する画面とAPI）
