@@ -1,12 +1,19 @@
 <?php
+require_once __DIR__ . '/includes/Database.php';
+require_once __DIR__ . '/includes/auth.php';
+$pdo = Database::connection();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'delete') {
+    $stmt = $pdo->prepare('DELETE FROM notices WHERE id = :id');
+    $stmt->execute(['id' => (int) $_POST['id']]);
+    header('Location: notice_list.php');
+    exit;
+}
+
 $pageTitle = 'お知らせ管理';
 require __DIR__ . '/includes/header.php';
 
-$notices = [
-    ['id' => 1, 'title' => '夏祭りのお知らせ', 'date' => '2026-07-01'],
-    ['id' => 2, 'title' => '防災訓練について', 'date' => '2026-06-15'],
-    ['id' => 3, 'title' => 'ゴミ収集日変更のお知らせ', 'date' => '2026-05-20'],
-];
+$notices = $pdo->query('SELECT id, title, published_at FROM notices ORDER BY published_at DESC')->fetchAll();
 ?>
 
 <div class="d-flex justify-content-end mb-3">
@@ -21,13 +28,20 @@ $notices = [
     <?php foreach ($notices as $n): ?>
     <tr>
       <td><?php echo htmlspecialchars($n['title']); ?></td>
-      <td><?php echo htmlspecialchars($n['date']); ?></td>
+      <td><?php echo htmlspecialchars($n['published_at']); ?></td>
       <td class="text-end">
         <a href="notice_form.php?id=<?php echo $n['id']; ?>" class="btn btn-sm btn-outline-secondary">編集</a>
-        <button class="btn btn-sm btn-outline-danger" type="button">削除</button>
+        <form action="notice_list.php" method="post" class="d-inline" onsubmit="return confirm('削除しますか？');">
+          <input type="hidden" name="_action" value="delete">
+          <input type="hidden" name="id" value="<?php echo $n['id']; ?>">
+          <button class="btn btn-sm btn-outline-danger" type="submit">削除</button>
+        </form>
       </td>
     </tr>
     <?php endforeach; ?>
+    <?php if (!$notices): ?>
+    <tr><td colspan="3" class="text-center text-muted py-4">お知らせがありません</td></tr>
+    <?php endif; ?>
   </tbody>
 </table>
 

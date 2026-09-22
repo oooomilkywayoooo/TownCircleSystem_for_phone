@@ -1,4 +1,7 @@
-<?php if (!isset($pageTitle)) { $pageTitle = '管理者画面'; } ?>
+<?php
+require_once __DIR__ . '/auth.php';
+if (!isset($pageTitle)) { $pageTitle = '管理者画面'; }
+?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>

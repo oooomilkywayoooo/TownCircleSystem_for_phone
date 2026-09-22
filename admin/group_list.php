@@ -1,12 +1,18 @@
 <?php
+require_once __DIR__ . '/includes/Database.php';
+require_once __DIR__ . '/includes/auth.php';
+$pdo = Database::connection();
+
 $pageTitle = 'グループ管理';
 require __DIR__ . '/includes/header.php';
 
-$groups = [
-    ['id' => 1, 'name' => '1丁目班', 'members' => 12, 'active' => true],
-    ['id' => 2, 'name' => '2丁目班', 'members' => 9, 'active' => true],
-    ['id' => 3, 'name' => '3丁目班', 'members' => 15, 'active' => false],
-];
+$groups = $pdo->query(
+    'SELECT g.id, g.name, g.is_active, COUNT(m.id) AS member_count
+     FROM member_groups g
+     LEFT JOIN members m ON m.group_id = g.id
+     GROUP BY g.id
+     ORDER BY g.sort_order'
+)->fetchAll();
 ?>
 
 <div class="d-flex justify-content-end mb-3">
@@ -21,9 +27,9 @@ $groups = [
     <?php foreach ($groups as $g): ?>
     <tr>
       <td><a href="group_detail.php?id=<?php echo $g['id']; ?>"><?php echo htmlspecialchars($g['name']); ?></a></td>
-      <td><?php echo $g['members']; ?>人</td>
+      <td><?php echo (int) $g['member_count']; ?>人</td>
       <td>
-        <?php if ($g['active']): ?>
+        <?php if ($g['is_active']): ?>
           <span class="badge bg-success">有効</span>
         <?php else: ?>
           <span class="badge bg-secondary">無効</span>
@@ -34,6 +40,9 @@ $groups = [
       </td>
     </tr>
     <?php endforeach; ?>
+    <?php if (!$groups): ?>
+    <tr><td colspan="4" class="text-center text-muted py-4">グループがありません</td></tr>
+    <?php endif; ?>
   </tbody>
 </table>
 

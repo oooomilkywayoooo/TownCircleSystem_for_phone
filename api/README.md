@@ -87,8 +87,8 @@ Flutter側は`mobile/lib/screens/leader_inbox_screen.dart`（一覧）と`leader
 ## ローカルでの動かし方
 
 ```bash
-DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=towncircle DB_USER=root DB_PASS=yourpassword \
-  php -S localhost:8099 -t api
+db/start-mysql.sh   # ローカル開発用MySQLを起動（初回はスキーマ・シードデータも適用）
+php -S localhost:8099 -t api   # config.phpの既定値がdb/start-mysql.shのDBに合っているので追加設定は不要
 ```
 
 Flutter側からは`http`パッケージ等で`http://<ホスト>:8099/v1/...`を呼び出し、ログインで得たトークンを`flutter_secure_storage`等に保存して以後のリクエストヘッダーに付与する想定です（現状の`mobile/`はまだ`mock_data.dart`のダミーデータのままで、API接続は未実装です）。
@@ -96,7 +96,8 @@ Flutter側からは`http`パッケージ等で`http://<ホスト>:8099/v1/...`�
 ## 未確定・次に決めること
 
 1. Flutter側の実際のHTTP通信化（`http`パッケージ導入、トークン保存、エラーハンドリングのUI反映）
-2. 管理者画面（PHP）側のDB接続実装（`admin/`の各画面のダミー配列を実クエリに置き換える）
-3. 画像・PDFアップロードの実装（`circulars.image_path` / `documents.file_path`の保存先確定）
-4. 本番のCORS設定（現状`Access-Control-Allow-Origin: *`は開発用）
+2. 画像・PDFアップロードの実装（`circulars.image_path` / `documents.file_path`の保存先確定）
+3. 本番のCORS設定（現状`Access-Control-Allow-Origin: *`は開発用）
+
+管理者画面（`admin/`）側のDB接続は完了しています（`db/README.md`参照）。
 5. 組長用の受信箱機能（複数会員とのチャットスレッドを一覧・返信する画面とAPI）

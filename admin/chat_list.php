@@ -1,72 +1,104 @@
 <?php
+require_once __DIR__ . '/includes/Database.php';
+require_once __DIR__ . '/includes/auth.php';
+$pdo = Database::connection();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'delete') {
+    $stmt = $pdo->prepare('DELETE FROM chat_messages WHERE id = :id');
+    $stmt->execute(['id' => (int) $_POST['message_id']]);
+    $redirect = 'chat_list.php';
+    if (isset($_POST['room'])) {
+        $redirect .= '?room=' . urlencode($_POST['room']);
+    }
+    header('Location: ' . $redirect);
+    exit;
+}
+
 $pageTitle = 'チャット管理';
 require __DIR__ . '/includes/header.php';
 
-// 会員管理と同じダミーデータ。個別チャットの相手（組長）はここから動的に解決する。
-$members = [
-    ['id' => 1, 'name' => '佐藤 太郎', 'group' => '1組', 'role' => '組長'],
-    ['id' => 2, 'name' => '鈴木 花子', 'group' => '2組', 'role' => '役職なし'],
-    ['id' => 3, 'name' => '高橋 次郎', 'group' => '1組', 'role' => '副組長'],
-];
-
-function leader_name_for_group(array $members, string $group): ?string
-{
-    foreach ($members as $m) {
-        if ($m['group'] === $group && $m['role'] === '組長') {
-            return $m['name'];
-        }
-    }
-    return null;
-}
-
 // 管理者はチャットの当事者ではなく閲覧・削除のみ（個別チャットは「会員 ⇔ その組の組長」）。
-// 全体チャット以外は、実際には「組長とのチャットを行っている会員」ごとに動的なリストになる想定。
-$rooms = [
-    ['type' => 'all', 'label' => '全体チャット'],
-    ['type' => 'member', 'member' => '高橋 次郎', 'group' => '1組'],
-    ['type' => 'member', 'member' => '鈴木 花子', 'group' => '2組'],
-];
+// 個別チャットのルームは、実際にやり取りが発生している会員から動的に一覧化する。
+$leaderThreads = $pdo->query(
+    "SELECT DISTINCT m.id, m.name, g.name AS group_name
+     FROM chat_messages cm
+     JOIN members m ON m.id = cm.member_id
+     LEFT JOIN member_groups g ON g.id = m.group_id
+     WHERE cm.room_type = 'leader_dm'
+     ORDER BY m.name"
+)->fetchAll();
 
-$selectedIndex = isset($_GET['room']) ? (int) $_GET['room'] : 0;
-if ($selectedIndex < 0 || $selectedIndex >= count($rooms)) {
-    $selectedIndex = 0;
+$selectedRoom = $_GET['room'] ?? 'all';
+
+function leader_name_for_group(PDO $pdo, ?string $groupName): ?string
+{
+    if (!$groupName) {
+        return null;
+    }
+    $stmt = $pdo->prepare(
+        "SELECT m.name FROM members m JOIN member_groups g ON g.id = m.group_id
+         WHERE g.name = :group_name AND m.role = 'leader' LIMIT 1"
+    );
+    $stmt->execute(['group_name' => $groupName]);
+    return $stmt->fetchColumn() ?: null;
 }
-$selectedRoom = $rooms[$selectedIndex];
 
-if ($selectedRoom['type'] === 'all') {
-    $roomLabel = $selectedRoom['label'];
-    $messages = [
-        ['sender' => '事務局', 'text' => '来週の町内清掃活動は9/27（日）朝8時からです。', 'time' => '09/20 10:02'],
-        ['sender' => '鈴木 花子', 'text' => '承知しました、参加します。', 'time' => '09/20 10:15'],
-        ['sender' => '佐藤 太郎', 'text' => '軍手を持参いただけると助かります。', 'time' => '09/20 10:20'],
-    ];
+if ($selectedRoom === 'all') {
+    $roomLabel = '全体チャット';
+    $stmt = $pdo->query(
+        "SELECT cm.id, cm.body, cm.created_at, cm.sender_is_admin,
+                COALESCE(m.name, '事務局') AS sender_name
+         FROM chat_messages cm
+         LEFT JOIN members m ON m.id = cm.sender_member_id
+         WHERE cm.room_type = 'all'
+         ORDER BY cm.created_at"
+    );
+    $messages = $stmt->fetchAll();
 } else {
-    $leaderName = leader_name_for_group($members, $selectedRoom['group']);
-    $roomLabel = $selectedRoom['member'] . 'さん ⇔ ' . $selectedRoom['group'] . 'の組長'
+    $memberId = (int) $selectedRoom;
+    $stmt = $pdo->prepare('SELECT name, group_id FROM members WHERE id = :id');
+    $stmt->execute(['id' => $memberId]);
+    $member = $stmt->fetch();
+
+    if (!$member) {
+        header('Location: chat_list.php');
+        exit;
+    }
+
+    $groupStmt = $pdo->prepare('SELECT name FROM member_groups WHERE id = :id');
+    $groupStmt->execute(['id' => $member['group_id']]);
+    $groupName = $groupStmt->fetchColumn() ?: null;
+    $leaderName = leader_name_for_group($pdo, $groupName);
+
+    $roomLabel = $member['name'] . 'さん ⇔ ' . ($groupName ?? '未所属') . 'の組長'
         . ($leaderName ? '（' . $leaderName . '）' : '（未設定）');
-    $messages = $selectedRoom['member'] === '高橋 次郎'
-        ? [
-            ['sender' => '高橋 次郎', 'text' => '来月の資源ごみ回収、当番表の確認をお願いします。', 'time' => '09/21 14:10'],
-            ['sender' => $leaderName ?? '組長', 'text' => '確認しました、ありがとうございます。', 'time' => '09/21 15:00'],
-        ]
-        : [
-            ['sender' => '鈴木 花子', 'text' => '来週の集金、何時頃になりますか？', 'time' => '09/19 11:00'],
-        ];
+
+    $stmt = $pdo->prepare(
+        "SELECT cm.id, cm.body, cm.created_at, cm.sender_is_admin,
+                COALESCE(m.name, '事務局') AS sender_name
+         FROM chat_messages cm
+         LEFT JOIN members m ON m.id = cm.sender_member_id
+         WHERE cm.room_type = 'leader_dm' AND cm.member_id = :member_id
+         ORDER BY cm.created_at"
+    );
+    $stmt->execute(['member_id' => $memberId]);
+    $messages = $stmt->fetchAll();
 }
 ?>
 
 <div class="row">
   <div class="col-md-3 mb-3">
     <div class="list-group">
-      <?php foreach ($rooms as $index => $r): ?>
-        <a href="chat_list.php?room=<?php echo $index; ?>"
-           class="list-group-item list-group-item-action <?php echo $index === $selectedIndex ? 'active' : ''; ?>">
-          <?php if ($r['type'] === 'all'): ?>
-            <?php echo htmlspecialchars($r['label']); ?>
-          <?php else: ?>
-            <?php echo htmlspecialchars($r['member']); ?>さん
-            <div class="small <?php echo $index === $selectedIndex ? 'text-white-50' : 'text-muted'; ?>"><?php echo htmlspecialchars($r['group']); ?>の組長とのチャット</div>
-          <?php endif; ?>
+      <a href="chat_list.php?room=all" class="list-group-item list-group-item-action <?php echo $selectedRoom === 'all' ? 'active' : ''; ?>">
+        全体チャット
+      </a>
+      <?php foreach ($leaderThreads as $t): ?>
+        <a href="chat_list.php?room=<?php echo $t['id']; ?>"
+           class="list-group-item list-group-item-action <?php echo (string) $selectedRoom === (string) $t['id'] ? 'active' : ''; ?>">
+          <?php echo htmlspecialchars($t['name']); ?>さん
+          <div class="small <?php echo (string) $selectedRoom === (string) $t['id'] ? 'text-white-50' : 'text-muted'; ?>">
+            <?php echo htmlspecialchars($t['group_name'] ?? '未所属'); ?>の組長とのチャット
+          </div>
         </a>
       <?php endforeach; ?>
     </div>
@@ -76,13 +108,21 @@ if ($selectedRoom['type'] === 'all') {
       <p class="text-muted mb-3"><?php echo htmlspecialchars($roomLabel); ?></p>
       <?php foreach ($messages as $m): ?>
         <div class="d-flex justify-content-between border-bottom py-2">
-          <div><strong><?php echo htmlspecialchars($m['sender']); ?></strong>：<?php echo htmlspecialchars($m['text']); ?></div>
+          <div><strong><?php echo htmlspecialchars($m['sender_name']); ?></strong>：<?php echo htmlspecialchars($m['body']); ?></div>
           <div class="text-nowrap ms-2">
-            <span class="text-muted small me-2"><?php echo htmlspecialchars($m['time']); ?></span>
-            <button class="btn btn-sm btn-outline-danger" type="button">削除</button>
+            <span class="text-muted small me-2"><?php echo htmlspecialchars($m['created_at']); ?></span>
+            <form action="chat_list.php" method="post" class="d-inline" onsubmit="return confirm('削除しますか？');">
+              <input type="hidden" name="_action" value="delete">
+              <input type="hidden" name="message_id" value="<?php echo $m['id']; ?>">
+              <input type="hidden" name="room" value="<?php echo htmlspecialchars($selectedRoom); ?>">
+              <button class="btn btn-sm btn-outline-danger" type="submit">削除</button>
+            </form>
           </div>
         </div>
       <?php endforeach; ?>
+      <?php if (!$messages): ?>
+        <p class="text-center text-muted py-4 mb-0">メッセージがありません</p>
+      <?php endif; ?>
     </div>
   </div>
 </div>

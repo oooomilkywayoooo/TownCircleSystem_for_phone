@@ -16,7 +16,7 @@
       <li class="list-group-item"><a href="survey_list.php" class="text-decoration-none">アンケート管理</a></li>
       <li class="list-group-item"><a href="document_list.php" class="text-decoration-none">資料管理</a></li>
       <li class="list-group-item"><a href="opinion_list.php" class="text-decoration-none">ご意見管理</a></li>
-      <li class="list-group-item"><a href="login.php" class="text-decoration-none text-danger">ログアウト</a></li>
+      <li class="list-group-item"><a href="logout.php" class="text-decoration-none text-danger">ログアウト</a></li>
     </ul>
   </div>
 </div>

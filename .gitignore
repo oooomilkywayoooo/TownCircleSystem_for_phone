@@ -1,2 +1,5 @@
 .DS_Store
 .claude/scheduled_tasks.lock
+
+# ローカル開発用MySQL（db/start-mysql.sh で作成。プロジェクト専用の使い捨てデータ）
+db/local/
