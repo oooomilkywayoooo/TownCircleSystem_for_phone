@@ -7,6 +7,11 @@ class CurrentUser {
   static const String phone = '090-3333-4444';
   static const String email = 'hanako.suzuki@example.com';
   static const int familyCount = 4;
+
+  /// none=役職なし, leader=組長, vice_leader=副組長。
+  /// 組長のときだけチャット画面が「組メンバー選択→個別チャット」の受信箱UIに切り替わる。
+  /// 'leader'に変更すると、佐藤太郎(1組の組長)としてメンバー対応(受信箱)画面を確認できる。
+  static const String role = 'none';
 }
 
 /// 組の一覧（管理者画面と統一した命名）
@@ -133,6 +138,41 @@ final List<ChatMessage> leaderChat = [
   ChatMessage(sender: groupLeaders[CurrentUser.group] ?? '組長', text: 'いつもありがとうございます。来月の回覧板は月初にお渡しします。', time: '09/18 08:40', isMe: false),
   const ChatMessage(sender: CurrentUser.name, text: 'ありがとうございます、よろしくお願いします。', time: '09/18 09:02', isMe: true),
 ];
+
+/// 組長用受信箱で使う、組ごとのメンバー一覧。
+class GroupMember {
+  final String name;
+  final String group;
+  final String role; // none / leader / vice_leader
+  const GroupMember({required this.name, required this.group, this.role = 'none'});
+}
+
+const List<GroupMember> groupMembersDirectory = [
+  GroupMember(name: '佐藤 太郎', group: '1組', role: 'leader'),
+  GroupMember(name: '高橋 次郎', group: '1組', role: 'vice_leader'),
+  GroupMember(name: '中村 美咲', group: '1組'),
+  GroupMember(name: '小林 健太', group: '1組'),
+  GroupMember(name: '田中 一郎', group: '2組', role: 'leader'),
+  GroupMember(name: '渡辺 久美', group: '2組', role: 'vice_leader'),
+  GroupMember(name: CurrentUser.name, group: '2組'),
+  GroupMember(name: '山本 誠', group: '2組'),
+  GroupMember(name: '伊藤 光', group: '3組', role: 'leader'),
+  GroupMember(name: '中村 誠', group: '3組', role: 'vice_leader'),
+  GroupMember(name: '吉田 真由美', group: '3組'),
+];
+
+/// 組長から見た「メンバー個人名 → 組長とのやり取り」の履歴。
+/// 組長が受信箱でメンバーを選んで開く個別チャットに対応する（isMeは組長自身の発言かどうか）。
+final Map<String, List<ChatMessage>> leaderDmThreads = {
+  '高橋 次郎': [
+    const ChatMessage(sender: '高橋 次郎', text: '来月の資源ごみ回収、当番表の確認をお願いします。', time: '09/21 14:10', isMe: false),
+  ],
+  '中村 美咲': [
+    const ChatMessage(sender: '中村 美咲', text: '来週の集金、何時頃になりますか？', time: '09/19 11:00', isMe: false),
+    const ChatMessage(sender: '佐藤 太郎', text: '土曜の午前中を予定しています。', time: '09/19 11:30', isMe: true),
+  ],
+  '小林 健太': [],
+};
 
 /// ゴミ当番は組単位ではなく会員個人単位で割り当てる。
 class GarbageDuty {

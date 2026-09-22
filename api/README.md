@@ -24,6 +24,9 @@
 - スケジュールの月フィルターが正しく絞り込むこと
 - 全体チャット・組長とのチャットへの投稿がそれぞれの`room_type`で正しく保存・取得できること、空メッセージが422で拒否されること
 - ご意見箱で`is_anonymous:true`の投稿がDB上も`member_id`がNULLで保存されること（named投稿は`member_id`が入ること）
+- 組長用受信箱：自組メンバー一覧が返り、他組のメンバー・メッセージが混ざらないこと。最新発言が本人以外なら`needs_reply:true`、組長が返信すると`false`に変わること
+- 組長が`chat_leader.php?member_id=`で指定メンバーのスレッドを読み書きできること、他組メンバーを指定すると403になること
+- 一般会員が`chat_leader.php?member_id=`で他人のスレッドを開こうとすると403、`chat_leader_inbox.php`を呼ぶと403になること（組長専用）
 
 ## エンドポイント一覧
 
@@ -43,8 +46,9 @@
 | GET | `/v1/schedules.php?month=YYYY-MM` | 必要 | スケジュール一覧（`month`省略で全件） |
 | GET | `/v1/chat_all.php` | 必要 | 町内会全体チャットの取得 |
 | POST | `/v1/chat_all.php` | 必要 | 町内会全体チャットへの投稿 |
-| GET | `/v1/chat_leader.php` | 必要 | 自分の組の組長との個別チャット取得 |
-| POST | `/v1/chat_leader.php` | 必要 | 組長への送信（下記の制約を参照） |
+| GET | `/v1/chat_leader.php[?member_id=]` | 必要 | 組長との個別チャット取得。`member_id`省略時は自分自身のスレッド、組長が指定する場合は下記参照 |
+| POST | `/v1/chat_leader.php[?member_id=]` | 必要 | 組長への送信、または組長からの返信 |
+| GET | `/v1/chat_leader_inbox.php` | 必要（組長のみ） | 組長用受信箱：自組メンバー一覧＋各メンバーとの最新メッセージ・未返信フラグ |
 | GET | `/v1/garbage_duties.php` | 必要 | ゴミ当番一覧（会員個人単位） |
 | GET | `/v1/surveys.php` | 必要 | アンケート一覧（Googleフォームリンク） |
 | GET | `/v1/documents.php` | 必要 | 関連資料一覧 |
@@ -52,9 +56,15 @@
 
 \* 送信自体はログイン済み会員のみだが、匿名フラグによりDB上は投稿者を特定できなくする。
 
-### `chat_leader.php`の既知の制約
+### 組長用受信箱（`chat_leader.php` / `chat_leader_inbox.php`）
 
-スレッドは常に「ログイン中の会員自身」を軸に特定します（`chat_messages.member_id` = 自分のid）。組長自身がこのAPIでログインしても、返ってくるのは「組長である自分」と「“自分の”組長」とのスレッド、つまり通常は自分自身の会員行動と同じ扱いになり、**他の会員から来たスレッド一覧を見る・代理返信する機能（組長用の受信箱）はまだありません**。これは現状のFlutterモックが会員1人分の視点しか実装していないことに合わせた意図的なスコープで、組長が複数の会員とやり取りする画面を作る際に別途エンドポイントが必要です。
+一般会員・副組長は`chat_leader.php`を`member_id`なしで呼び、常に「自分自身と自組の組長」とのスレッドを読み書きする。
+
+組長は追加で2つの操作ができる。
+1. `GET /v1/chat_leader_inbox.php` で自組メンバー一覧を取得する。各メンバーに`last_message` `last_message_at` `needs_reply`が付き、`needs_reply`は「そのスレッドの最新メッセージが組長自身の発言でないか」で判定する（既読テーブルは持たない近似）。
+2. `chat_leader.php?member_id={対象会員id}` を指定して、選んだメンバーとのスレッドを読み書きする。対象は自分と同じ組の会員に限り、他の組の会員を指定すると403になる。組長以外がこのパラメータを使おうとした場合も403。
+
+Flutter側は`mobile/lib/screens/leader_inbox_screen.dart`（一覧）と`leader_chat_detail_screen.dart`（個別チャット）で対応する。`CurrentUser.role`が`'leader'`のときだけチャット画面の2つ目のタブが「組長とのチャット」から「メンバー対応」に切り替わる（`mobile/lib/data/mock_data.dart`）。
 
 ## レスポンス例
 
