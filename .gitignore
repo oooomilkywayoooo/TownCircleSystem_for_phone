@@ -3,3 +3,9 @@
 
 # ローカル開発用MySQL（db/start-mysql.sh で作成。プロジェクト専用の使い捨てデータ）
 db/local/
+
+# 管理者画面からアップロードされたファイル（ユーザーデータのためコミットしない）
+api/uploads/*
+!api/uploads/*/
+api/uploads/*/*
+!api/uploads/*/.gitkeep

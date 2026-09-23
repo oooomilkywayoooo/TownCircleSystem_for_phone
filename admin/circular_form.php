@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/Database.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/uploads.php';
 $pdo = Database::connection();
 
 $error = null;
@@ -11,13 +12,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $endDate = $_POST['end_date'] ?? '';
 
     if ($title !== '' && $startDate !== '' && $endDate !== '') {
-        // 画像アップロードの保存処理は未実装（api/README.md参照）。現時点ではimage_pathはNULLのまま登録する。
-        $stmt = $pdo->prepare('INSERT INTO circulars (title, body, start_date, end_date) VALUES (:title, :body, :start_date, :end_date)');
-        $stmt->execute(['title' => $title, 'body' => $body ?: null, 'start_date' => $startDate, 'end_date' => $endDate]);
-        header('Location: circular_list.php');
-        exit;
+        try {
+            $imagePath = save_uploaded_image($_FILES['image'] ?? [], 'circulars');
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO circulars (title, body, image_path, start_date, end_date) VALUES (:title, :body, :image_path, :start_date, :end_date)'
+            );
+            $stmt->execute([
+                'title' => $title,
+                'body' => $body ?: null,
+                'image_path' => $imagePath,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ]);
+            header('Location: circular_list.php');
+            exit;
+        } catch (RuntimeException $e) {
+            $error = $e->getMessage();
+        }
+    } else {
+        $error = 'タイトル・掲載開始日・掲載終了日は必須です';
     }
-    $error = 'タイトル・掲載開始日・掲載終了日は必須です';
 }
 
 $pageTitle = '回覧板 新規登録';
@@ -38,8 +53,8 @@ require __DIR__ . '/includes/header.php';
   </div>
   <div class="mb-3">
     <label class="form-label">画像</label>
-    <input type="file" class="form-control" name="image">
-    <div class="form-text">画像の保存処理は未実装です（登録自体は画像なしで行えます）。</div>
+    <input type="file" class="form-control" name="image" accept="image/*">
+    <div class="form-text">jpg・png・gif・webp、5MBまで。未選択の場合は画像なしで登録されます。</div>
   </div>
   <div class="row mb-3">
     <div class="col">

@@ -1,3 +1,5 @@
+import '../services/api_config.dart';
+
 class Circular {
   final int id;
   final String title;
@@ -18,6 +20,9 @@ class Circular {
   });
 
   String get period => '$startDate 〜 $endDate';
+
+  /// 管理者側でアップロードされた画像のURL。未アップロードならnull。
+  String? get imageUrl => imagePath == null ? null : '${ApiConfig.mediaBaseUrl}/uploads/$imagePath';
 
   /// スケジュール等の月フィルターと合わせるための yyyy-MM。
   String get month => startDate.substring(0, 7);

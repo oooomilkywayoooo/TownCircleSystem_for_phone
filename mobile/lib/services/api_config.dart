@@ -9,13 +9,17 @@ class ApiConfig {
 
   static const int port = 8099;
 
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:$port/v1';
+  static String get _host {
+    if (!kIsWeb && io.Platform.isAndroid) {
+      return '10.0.2.2';
     }
-    if (io.Platform.isAndroid) {
-      return 'http://10.0.2.2:$port/v1';
-    }
-    return 'http://localhost:$port/v1';
+    return 'localhost';
   }
+
+  /// JSON API（/v1/...）のベースURL。
+  static String get baseUrl => 'http://$_host:$port/v1';
+
+  /// 管理者側でアップロードされた画像・資料の配信元（api/uploads/ を静的配信）。
+  /// 例: '$mediaBaseUrl/uploads/circulars/xxxx.jpg'
+  static String get mediaBaseUrl => 'http://$_host:$port';
 }

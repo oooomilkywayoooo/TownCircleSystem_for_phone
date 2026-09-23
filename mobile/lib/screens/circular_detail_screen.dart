@@ -54,20 +54,23 @@ class _CircularDetailScreenState extends State<CircularDetailScreen> {
               child: InteractiveViewer(
                 minScale: 1,
                 maxScale: 4,
-                child: Container(
-                  height: 260,
-                  width: double.infinity,
-                  color: AppTheme.primary.withValues(alpha: 0.08),
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.image_rounded, size: 72, color: AppTheme.primary),
-                      SizedBox(height: 8),
-                      Text('回覧板の画像（サンプル）', style: TextStyle(color: AppTheme.primary)),
-                    ],
-                  ),
-                ),
+                child: c.imageUrl != null
+                    ? Image.network(
+                        c.imageUrl!,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            height: 260,
+                            alignment: Alignment.center,
+                            color: AppTheme.primary.withValues(alpha: 0.08),
+                            child: const CircularProgressIndicator(),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => _imagePlaceholder('画像を読み込めませんでした'),
+                      )
+                    : _imagePlaceholder('この回覧板に画像は登録されていません'),
               ),
             ),
             const SizedBox(height: 20),
@@ -107,6 +110,23 @@ class _CircularDetailScreenState extends State<CircularDetailScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _imagePlaceholder(String message) {
+    return Container(
+      height: 260,
+      width: double.infinity,
+      color: AppTheme.primary.withValues(alpha: 0.08),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.image_not_supported_rounded, size: 56, color: AppTheme.primary),
+          const SizedBox(height: 8),
+          Text(message, style: const TextStyle(color: AppTheme.primary), textAlign: TextAlign.center),
+        ],
       ),
     );
   }
