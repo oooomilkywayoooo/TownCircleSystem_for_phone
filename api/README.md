@@ -91,13 +91,13 @@ db/start-mysql.sh   # ローカル開発用MySQLを起動（初回はスキー�
 php -S localhost:8099 -t api   # config.phpの既定値がdb/start-mysql.shのDBに合っているので追加設定は不要
 ```
 
-Flutter側からは`http`パッケージ等で`http://<ホスト>:8099/v1/...`を呼び出し、ログインで得たトークンを`flutter_secure_storage`等に保存して以後のリクエストヘッダーに付与する想定です（現状の`mobile/`はまだ`mock_data.dart`のダミーデータのままで、API接続は未実装です）。
+Flutterアプリ（`mobile/`）は`http`パッケージでこのAPIを実際に呼び出しています。トークンは`Session`（`mobile/lib/services/session.dart`）にアプリ実行中のみ保持する方式で、再起動をまたいだ永続化はまだ行っていません。iOSシミュレータ・Webは`http://localhost:8099/v1`にそのまま到達できますが、Androidエミュレータは`10.0.2.2`に読み替えます（`mobile/lib/services/api_config.dart`）。
 
 ## 未確定・次に決めること
 
-1. Flutter側の実際のHTTP通信化（`http`パッケージ導入、トークン保存、エラーハンドリングのUI反映）
+1. ログイントークンの永続化（アプリ再起動をまたいだログイン状態の保持。`flutter_secure_storage`等）
 2. 画像・PDFアップロードの実装（`circulars.image_path` / `documents.file_path`の保存先確定）
 3. 本番のCORS設定（現状`Access-Control-Allow-Origin: *`は開発用）
 
-管理者画面（`admin/`）側のDB接続は完了しています（`db/README.md`参照）。
+管理者画面（`admin/`）側のDB接続は完了しています（`db/README.md`参照）。Flutter側の実API接続もiOSシミュレータで実機タップ検証済みです：管理者画面で作成したお知らせ・回覧板がアプリに表示されること、アプリ側の既読化・チャット送信が実際にDBへ書き込まれ管理者側にも反映されることを確認しています。
 5. 組長用の受信箱機能（複数会員とのチャットスレッドを一覧・返信する画面とAPI）

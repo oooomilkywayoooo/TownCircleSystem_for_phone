@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:town_circle_app/main.dart';
+import 'package:town_circle_app/services/api_client.dart';
+import 'package:town_circle_app/services/session.dart';
+
+import 'support/mock_api.dart';
 
 void main() {
+  setUp(() {
+    ApiClient.client = buildMockApiClient();
+    Session.instance.clear();
+  });
+
   testWidgets('ログイン→ホーム→ドロワーから回覧板→既読化までの一連の操作', (tester) async {
     await tester.pumpWidget(const TownCircleApp());
     await tester.pumpAndSettle();
 
     // ログイン画面 → ログインボタンでホームへ
     expect(find.text('ログイン'), findsWidgets);
+    await tester.enterText(find.byType(TextField).first, 'hanako.suzuki@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'password123');
     await tester.tap(find.widgetWithText(ElevatedButton, 'ログイン'));
     await tester.pumpAndSettle();
 
@@ -37,6 +48,8 @@ void main() {
   testWidgets('チャット画面でメッセージを送信できる', (tester) async {
     await tester.pumpWidget(const TownCircleApp());
     await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'hanako.suzuki@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'password123');
     await tester.tap(find.widgetWithText(ElevatedButton, 'ログイン'));
     await tester.pumpAndSettle();
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
 import '../screens/chat_screen.dart';
 import '../screens/documents_screen.dart';
 import '../screens/emergency_contact_screen.dart';
@@ -11,6 +10,7 @@ import '../screens/opinion_screen.dart';
 import '../screens/password_confirm_screen.dart';
 import '../screens/schedule_screen.dart';
 import '../screens/survey_screen.dart';
+import '../services/session.dart';
 import '../theme/app_theme.dart';
 
 class DrawerItem {
@@ -58,9 +58,17 @@ class AppDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${CurrentUser.name} さん（${CurrentUser.group}）',
+                    '${Session.instance.name ?? ''} さん（${Session.instance.groupName ?? '未所属'}）',
                     style: const TextStyle(color: Colors.white, fontSize: 15),
                   ),
+                  if (Session.instance.isLeader)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        Session.instance.roleLabel,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -81,6 +89,7 @@ class AppDrawer extends StatelessWidget {
                       style: TextStyle(fontSize: 18, color: AppTheme.danger, fontWeight: FontWeight.w600),
                     ),
                     onTap: () {
+                      Session.instance.clear();
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                         (route) => false,

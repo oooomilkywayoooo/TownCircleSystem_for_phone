@@ -8,7 +8,7 @@ require_method('GET');
 $month = $_GET['month'] ?? null; // YYYY-MM 形式
 
 $pdo = Database::connection();
-$sql = 'SELECT c.id, c.title, c.image_path, c.start_date, c.end_date,
+$sql = 'SELECT c.id, c.title, c.body, c.image_path, c.start_date, c.end_date,
                (cr.id IS NOT NULL) AS is_read
         FROM circulars c
         LEFT JOIN circular_reads cr

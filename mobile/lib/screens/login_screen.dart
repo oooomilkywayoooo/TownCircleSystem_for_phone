@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/api_client.dart';
+import '../services/session.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
@@ -14,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -22,11 +25,71 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-      (route) => false,
-    );
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('メールアドレスとパスワードを入力してください')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final data = await ApiClient.post('/auth/login.php', body: {
+        'email': email,
+        'password': password,
+      });
+      Session.instance.applyLogin(
+        token: data['token'] as String,
+        member: data['member'] as Map<String, dynamic>,
+      );
+      // ログインのレスポンスはgroup_nameを含まない要約情報のため、/me.phpで完全なプロフィールを補う。
+      try {
+        final me = await ApiClient.get('/me.php');
+        Session.instance.applyMember(me as Map<String, dynamic>);
+      } catch (_) {
+        // 補完に失敗しても致命的ではないため、ログイン自体は続行する。
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('サーバーに接続できませんでした。しばらくしてから再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _requestPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('メールアドレスを入力してください')),
+      );
+      return;
+    }
+    try {
+      await ApiClient.post('/auth/password_reset_request.php', body: {'email': email});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('パスワード再設定用のメールを送信しました（登録されている場合）')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('サーバーに接続できませんでした')),
+      );
+    }
   }
 
   @override
@@ -80,26 +143,30 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('パスワード再設定用のメールを送信しました（モック）')),
-                    );
-                  },
+                  onPressed: _submitting ? null : _requestPasswordReset,
                   child: const Text('パスワードをお忘れの方'),
                 ),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: _login,
-                child: const Text('ログイン'),
+                onPressed: _submitting ? null : _login,
+                child: _submitting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Text('ログイン'),
               ),
               const SizedBox(height: 16),
               OutlinedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                  );
-                },
+                onPressed: _submitting
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                        );
+                      },
                 child: const Text('新規登録はこちら'),
               ),
             ],

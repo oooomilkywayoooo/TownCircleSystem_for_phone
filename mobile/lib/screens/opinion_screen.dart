@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_client.dart';
 import '../widgets/app_scaffold.dart';
 
 class OpinionScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class OpinionScreen extends StatefulWidget {
 class _OpinionScreenState extends State<OpinionScreen> {
   final _controller = TextEditingController();
   bool _anonymous = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -18,32 +20,52 @@ class _OpinionScreenState extends State<OpinionScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_controller.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ご意見の内容を入力してください')),
       );
       return;
     }
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('送信しました'),
-        content: Text(_anonymous ? '匿名でご意見を送信しました。ご協力ありがとうございました。' : 'ご意見を送信しました。ご協力ありがとうございました。'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              setState(() {
-                _controller.clear();
-                _anonymous = false;
-              });
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+
+    setState(() => _submitting = true);
+    try {
+      await ApiClient.post('/opinions.php', body: {
+        'body': _controller.text.trim(),
+        'is_anonymous': _anonymous,
+      });
+      if (!mounted) return;
+      final anonymous = _anonymous;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('送信しました'),
+          content: Text(anonymous ? '匿名でご意見を送信しました。ご協力ありがとうございました。' : 'ご意見を送信しました。ご協力ありがとうございました。'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _controller.clear();
+                  _anonymous = false;
+                });
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('サーバーに接続できませんでした')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -77,7 +99,16 @@ class _OpinionScreenState extends State<OpinionScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          ElevatedButton(onPressed: _submit, child: const Text('送信する')),
+          ElevatedButton(
+            onPressed: _submitting ? null : _submit,
+            child: _submitting
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                  )
+                : const Text('送信する'),
+          ),
         ],
       ),
     );

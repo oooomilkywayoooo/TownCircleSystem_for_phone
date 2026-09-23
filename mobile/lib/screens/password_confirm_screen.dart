@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../services/api_client.dart';
 import 'profile_edit_screen.dart';
 
 /// 会員情報変更画面を開く前に、現在のパスワードを確認するためのゲート画面。
-/// モックのため、8文字以上入力すれば認証成功として扱う。
+/// PUT /v1/me.php はcurrent_password必須のため、他フィールドを送らない形で
+/// このゲートの時点から実際にサーバー側の検証を行う。
 class PasswordConfirmScreen extends StatefulWidget {
   const PasswordConfirmScreen({super.key});
 
@@ -13,6 +15,7 @@ class PasswordConfirmScreen extends StatefulWidget {
 class _PasswordConfirmScreenState extends State<PasswordConfirmScreen> {
   final _controller = TextEditingController();
   bool _obscure = true;
+  bool _submitting = false;
   String? _errorText;
 
   @override
@@ -21,14 +24,30 @@ class _PasswordConfirmScreenState extends State<PasswordConfirmScreen> {
     super.dispose();
   }
 
-  void _confirm() {
-    if (_controller.text.length < 8) {
-      setState(() => _errorText = 'パスワードが正しくありません');
+  Future<void> _confirm() async {
+    final password = _controller.text;
+    if (password.isEmpty) {
+      setState(() => _errorText = 'パスワードを入力してください');
       return;
     }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
-    );
+
+    setState(() {
+      _submitting = true;
+      _errorText = null;
+    });
+    try {
+      await ApiClient.put('/me.php', body: {'current_password': password});
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => ProfileEditScreen(currentPassword: password)),
+      );
+    } on ApiException catch (e) {
+      setState(() => _errorText = e.message);
+    } catch (e) {
+      setState(() => _errorText = 'サーバーに接続できませんでした');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -64,7 +83,16 @@ class _PasswordConfirmScreenState extends State<PasswordConfirmScreen> {
                 onSubmitted: (_) => _confirm(),
               ),
               const SizedBox(height: 24),
-              ElevatedButton(onPressed: _confirm, child: const Text('確認して進む')),
+              ElevatedButton(
+                onPressed: _submitting ? null : _confirm,
+                child: _submitting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Text('確認して進む'),
+              ),
             ],
           ),
         ),

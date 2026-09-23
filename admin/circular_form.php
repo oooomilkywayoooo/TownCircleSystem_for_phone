@@ -6,13 +6,14 @@ $pdo = Database::connection();
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
+    $body = trim($_POST['body'] ?? '');
     $startDate = $_POST['start_date'] ?? '';
     $endDate = $_POST['end_date'] ?? '';
 
     if ($title !== '' && $startDate !== '' && $endDate !== '') {
         // 画像アップロードの保存処理は未実装（api/README.md参照）。現時点ではimage_pathはNULLのまま登録する。
-        $stmt = $pdo->prepare('INSERT INTO circulars (title, start_date, end_date) VALUES (:title, :start_date, :end_date)');
-        $stmt->execute(['title' => $title, 'start_date' => $startDate, 'end_date' => $endDate]);
+        $stmt = $pdo->prepare('INSERT INTO circulars (title, body, start_date, end_date) VALUES (:title, :body, :start_date, :end_date)');
+        $stmt->execute(['title' => $title, 'body' => $body ?: null, 'start_date' => $startDate, 'end_date' => $endDate]);
         header('Location: circular_list.php');
         exit;
     }
@@ -30,6 +31,10 @@ require __DIR__ . '/includes/header.php';
   <div class="mb-3">
     <label class="form-label">タイトル</label>
     <input type="text" class="form-control" name="title" value="<?php echo htmlspecialchars($_POST['title'] ?? ''); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">本文</label>
+    <textarea class="form-control" name="body" rows="4"><?php echo htmlspecialchars($_POST['body'] ?? ''); ?></textarea>
   </div>
   <div class="mb-3">
     <label class="form-label">画像</label>

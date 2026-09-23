@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../models/circular.dart';
+import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 
 /// 回覧板の詳細・画像拡大表示画面。開いた時点で自動的に既読へ切り替える。
@@ -12,10 +13,24 @@ class CircularDetailScreen extends StatefulWidget {
 }
 
 class _CircularDetailScreenState extends State<CircularDetailScreen> {
+  bool _markingRead = true;
+  bool _markFailed = false;
+
   @override
   void initState() {
     super.initState();
-    widget.circular.read = true;
+    _markAsRead();
+  }
+
+  Future<void> _markAsRead() async {
+    try {
+      await ApiClient.post('/circular_read.php', query: {'id': '${widget.circular.id}'});
+      widget.circular.isRead = true;
+    } catch (e) {
+      _markFailed = true;
+    } finally {
+      if (mounted) setState(() => _markingRead = false);
+    }
   }
 
   @override
@@ -59,17 +74,37 @@ class _CircularDetailScreenState extends State<CircularDetailScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(c.detail, style: const TextStyle(fontSize: 16, height: 1.6)),
+                child: Text(
+                  c.body ?? '本文はありません',
+                  style: const TextStyle(fontSize: 16, height: 1.6),
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.check_circle, color: AppTheme.success, size: 20),
-                const SizedBox(width: 6),
-                const Text('既読にしました', style: TextStyle(color: AppTheme.success, fontSize: 14)),
-              ],
-            ),
+            if (_markingRead)
+              const Row(
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 10),
+                  Text('既読にしています…', style: TextStyle(color: Colors.black54, fontSize: 14)),
+                ],
+              )
+            else if (_markFailed)
+              const Row(
+                children: [
+                  Icon(Icons.error_outline, color: AppTheme.danger, size: 20),
+                  SizedBox(width: 6),
+                  Text('既読の記録に失敗しました', style: TextStyle(color: AppTheme.danger, fontSize: 14)),
+                ],
+              )
+            else
+              const Row(
+                children: [
+                  Icon(Icons.check_circle, color: AppTheme.success, size: 20),
+                  SizedBox(width: 6),
+                  Text('既読にしました', style: TextStyle(color: AppTheme.success, fontSize: 14)),
+                ],
+              ),
           ],
         ),
       ),

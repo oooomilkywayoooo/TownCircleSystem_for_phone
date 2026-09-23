@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../models/member_group.dart';
+import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import '../widgets/group_selector.dart';
 
@@ -20,9 +21,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordConfirmController = TextEditingController();
 
   int _familyCount = 1;
-  String _selectedGroup = groupList.first;
+  int? _selectedGroupId;
   bool _obscure1 = true;
   bool _obscure2 = true;
+  bool _submitting = false;
+
+  late Future<List<MemberGroup>> _groupsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _groupsFuture = _loadGroups();
+  }
+
+  Future<List<MemberGroup>> _loadGroups() async {
+    final data = await ApiClient.get('/groups.php') as List;
+    final groups = data.map((e) => MemberGroup.fromJson(e as Map<String, dynamic>)).toList();
+    if (groups.isNotEmpty) {
+      setState(() => _selectedGroupId = groups.first.id);
+    }
+    return groups;
+  }
 
   @override
   void dispose() {
@@ -35,7 +54,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_passwordController.text != _passwordConfirmController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,22 +62,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('登録が完了しました'),
-        content: const Text('ログイン画面からログインしてください。（モック表示）'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    if (_selectedGroupId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('グループを選択してください')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await ApiClient.post('/auth/register.php', body: {
+        'name': _nameController.text.trim(),
+        'address': _addressController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'email': _emailController.text.trim(),
+        'family_count': _familyCount,
+        'group_id': _selectedGroupId,
+        'password': _passwordController.text,
+      });
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('登録が完了しました'),
+          content: const Text('ログイン画面からログインしてください。'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('サーバーに接続できませんでした')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -112,9 +161,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 20),
               const _FieldLabel('グループ（組）'),
-              GroupSelector(
-                selected: _selectedGroup,
-                onChanged: (g) => setState(() => _selectedGroup = g),
+              FutureBuilder<List<MemberGroup>>(
+                future: _groupsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                  if (snapshot.hasError || !snapshot.hasData) {
+                    return const Text('グループを取得できませんでした', style: TextStyle(color: AppTheme.danger));
+                  }
+                  return GroupSelector(
+                    groups: snapshot.data!,
+                    selectedId: _selectedGroupId,
+                    onChanged: (id) => setState(() => _selectedGroupId = id),
+                  );
+                },
               ),
               const SizedBox(height: 20),
               const _FieldLabel('パスワード'),
@@ -147,7 +211,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 validator: (v) => (v == null || v.isEmpty) ? 'もう一度入力してください' : null,
               ),
               const SizedBox(height: 32),
-              ElevatedButton(onPressed: _submit, child: const Text('新規登録')),
+              ElevatedButton(
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Text('新規登録'),
+              ),
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),

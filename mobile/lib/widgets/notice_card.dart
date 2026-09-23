@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../models/notice.dart';
 import '../theme/app_theme.dart';
 
 class NoticeCard extends StatelessWidget {
@@ -27,7 +27,7 @@ class NoticeCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(notice.body, style: const TextStyle(fontSize: 15, height: 1.5)),
             const SizedBox(height: 8),
-            Text(notice.date, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+            Text(notice.publishedAt, style: const TextStyle(fontSize: 13, color: Colors.black45)),
           ],
         ),
       ),

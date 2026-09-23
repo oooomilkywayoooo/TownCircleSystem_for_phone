@@ -107,6 +107,7 @@ CREATE TABLE notices (
 CREATE TABLE circulars (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title           VARCHAR(200)    NOT NULL,
+    body            TEXT            NULL,
     image_path      VARCHAR(255)    NULL,
     start_date      DATE            NOT NULL,
     end_date        DATE            NOT NULL,

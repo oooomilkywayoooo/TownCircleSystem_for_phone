@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../models/chat_message.dart';
 import '../theme/app_theme.dart';
 
 /// メッセージ一覧＋入力欄のチャット表示。町内会全体チャット・組長との個別チャットの両方で使う。
 class ChatPanel extends StatefulWidget {
   final List<ChatMessage> messages;
   final String headerText;
-  final ValueChanged<String> onSend;
+  final Future<void> Function(String text) onSend;
   const ChatPanel({super.key, required this.messages, required this.headerText, required this.onSend});
 
   @override
@@ -15,6 +15,7 @@ class ChatPanel extends StatefulWidget {
 
 class _ChatPanelState extends State<ChatPanel> {
   final _controller = TextEditingController();
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -22,11 +23,22 @@ class _ChatPanelState extends State<ChatPanel> {
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    widget.onSend(text);
-    _controller.clear();
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    try {
+      await widget.onSend(text);
+      _controller.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('送信に失敗しました')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
@@ -77,12 +89,18 @@ class _ChatPanelState extends State<ChatPanel> {
                   width: 52,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _send,
+                    onPressed: _sending ? null : _send,
                     style: ElevatedButton.styleFrom(
                       padding: EdgeInsets.zero,
                       shape: const CircleBorder(),
                     ),
-                    child: const Icon(Icons.send_rounded, size: 24),
+                    child: _sending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.send_rounded, size: 24),
                   ),
                 ),
               ],
@@ -112,7 +130,7 @@ class _MessageBubble extends StatelessWidget {
           if (!message.isMe)
             Padding(
               padding: const EdgeInsets.only(bottom: 4, left: 4),
-              child: Text(message.sender, style: const TextStyle(fontSize: 13, color: Colors.black54)),
+              child: Text(message.senderName, style: const TextStyle(fontSize: 13, color: Colors.black54)),
             ),
           Row(
             mainAxisSize: MainAxisSize.min,
